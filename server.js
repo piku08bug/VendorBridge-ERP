@@ -38,3 +38,5 @@ if (!db.prepare("SELECT 1 FROM users WHERE role='Admin'").get()) {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log('Running on http://localhost:' + port));
+
+module.exports = app;
