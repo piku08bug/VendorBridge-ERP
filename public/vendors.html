@@ -1,0 +1,150 @@
+<!doctype html>
+<html data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Vendors | VendorBridge</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="style.css" rel="stylesheet">
+</head>
+<body>
+<main class="main">
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h4 class="mb-0">Vendors</h4>
+      <p class="text-secondary mb-0">Manage supplier profiles and registrations</p>
+    </div>
+    <button id="addBtn" class="btn btn-green btn-sm d-none" onclick="openForm()">+ Add Vendor</button>
+  </div>
+  <div id="pageMsg"></div>
+
+  <input id="q" class="form-control mb-3" placeholder="Search by name, gst number, category..." oninput="load()">
+  <div id="tabs" class="d-flex gap-2 flex-wrap mb-3"></div>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Vendor Name</th><th>Category</th><th>GST no.</th><th>Contact no.</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div id="empty" class="empty d-none">No vendors found.</div>
+</main>
+
+<div class="modal fade" id="vm">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5>Vendor Details</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body" id="vbody"></div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="m">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 id="mt">Vendor</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div id="fmsg"></div>
+      <input id="name" class="form-control mb-2" placeholder="Vendor name *">
+      <select id="category" class="form-select mb-2"></select>
+      <input id="gst_number" class="form-control mb-2" placeholder="GSTIN * (29ABCDE1234F1Z5)">
+      <input id="contact_person" class="form-control mb-2" placeholder="Contact person *">
+      <input id="email" class="form-control mb-2" placeholder="Email *">
+      <input id="phone" class="form-control mb-2" placeholder="Contact no. (10 digits) *">
+      <textarea id="address" class="form-control mb-2" placeholder="Address"></textarea>
+      <select id="status" class="form-select">
+        <option>Active</option><option>Pending</option><option>Blocked</option>
+      </select>
+    </div>
+    <div class="modal-footer"><button class="btn btn-green" onclick="save()">Save</button></div>
+  </div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="app.js"></script>
+<script>
+const CATS = ['Raw Materials', 'IT & Electronics', 'Office Supplies', 'Furniture', 'Logistics', 'Services', 'Machinery', 'Other'];
+const FIELDS = ['name', 'category', 'gst_number', 'contact_person', 'email', 'phone', 'address', 'status'];
+const badge = { Active: 'success', Pending: 'warning', Blocked: 'danger' };
+let user, editId = null, formModal, st = '';
+const $ = id => document.getElementById(id);
+const canW = () => ['Procurement Officer', 'Admin'].includes(user.role);
+
+(async () => {
+  user = await initPage('Vendors');
+  if (user.role === 'Vendor') { location.href = '/dashboard.html'; return; }
+  formModal = new bootstrap.Modal($('m'));
+  $('category').innerHTML = CATS.map(c => `<option>${c}</option>`).join('');
+  if (canW()) $('addBtn').classList.remove('d-none');
+  await load();
+  if (location.search.includes('new') && canW()) openForm();
+})();
+
+function setTab(s) { st = s; load(); }
+
+async function load() {
+  try {
+    const all = await api('/api/vendors');
+    const c = s => all.filter(v => v.status === s).length;
+    $('tabs').innerHTML = [['', 'All', all.length], ['Active', 'Active', c('Active')],
+      ['Pending', 'Pending', c('Pending')], ['Blocked', 'Blocked', c('Blocked')]]
+      .map(([s, l, n]) => `<button class="btn btn-sm ${st === s ? 'btn-success' : 'btn-outline-secondary'}" onclick="setTab('${s}')">${l} (${n})</button>`).join('');
+
+    const p = new URLSearchParams({ q: $('q').value, status: st });
+    const v = await api('/api/vendors?' + p);
+    $('rows').innerHTML = v.map(x => `<tr>
+      <td>${esc(x.name)}</td><td>${esc(x.category)}</td><td>${esc(x.gst_number)}</td>
+      <td>${esc(x.phone)}</td>
+      <td><span class="badge bg-${badge[x.status]}">${esc(x.status)}</span></td>
+      <td>
+        <button class="btn btn-sm btn-outline-light" onclick="viewVendor(${x.id})">View</button>
+        ${canW() ? `<button class="btn btn-sm btn-outline-primary" onclick="openForm(${x.id})">Edit</button>` : ''}
+        ${user.role === 'Admin' ? `<button class="btn btn-sm btn-outline-danger" onclick="del(${x.id})">Delete</button>` : ''}
+      </td></tr>`).join('');
+    $('empty').classList.toggle('d-none', v.length > 0);
+  } catch (e) { showErr('pageMsg', e.message); }
+}
+
+async function viewVendor(id) {
+  try {
+    const v = await api('/api/vendors/' + id);
+    $('vbody').innerHTML = `
+      <p><b>Name:</b> ${esc(v.name)}</p>
+      <p><b>Category:</b> ${esc(v.category)}</p>
+      <p><b>GSTIN:</b> ${esc(v.gst_number)}</p>
+      <p><b>Contact person:</b> ${esc(v.contact_person)}</p>
+      <p><b>Email:</b> ${esc(v.email)}</p>
+      <p><b>Contact no.:</b> ${esc(v.phone)}</p>
+      <p><b>Address:</b> ${esc(v.address) || '-'}</p>
+      <p><b>Status:</b> <span class="badge bg-${badge[v.status]}">${esc(v.status)}</span></p>
+      <p class="text-secondary small mb-0">Created: ${esc(v.created_at)}</p>`;
+    new bootstrap.Modal($('vm')).show();
+  } catch (e) { showErr('pageMsg', e.message); }
+}
+
+async function openForm(id) {
+  editId = id || null;
+  $('fmsg').className = ''; $('fmsg').textContent = '';
+  FIELDS.forEach(k => $(k).value = k === 'status' ? 'Active' : (k === 'category' ? CATS[0] : ''));
+  $('mt').textContent = id ? 'Edit Vendor' : 'Add Vendor';
+  if (id) {
+    const v = await api('/api/vendors/' + id);
+    FIELDS.forEach(k => $(k).value = v[k] || '');
+  }
+  formModal.show();
+}
+
+async function save() {
+  try {
+    const b = {};
+    FIELDS.forEach(k => b[k] = $(k).value);
+    editId ? await api('/api/vendors/' + editId, 'PUT', b) : await api('/api/vendors', 'POST', b);
+    formModal.hide(); load();
+  } catch (e) { showErr('fmsg', e.message); }
+}
+
+async function del(id) {
+  if (!confirm('Delete this vendor?')) return;
+  try { await api('/api/vendors/' + id, 'DELETE'); load(); }
+  catch (e) { showErr('pageMsg', e.message); }
+}
+</script>
+</body>
+</html>
