@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
-const { auth, allow } = require('../middleware');
+const { auth, allow } = require('../authMiddleware');
 
 const STATUSES = ['Active', 'Pending', 'Blocked'];
 const GST = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;

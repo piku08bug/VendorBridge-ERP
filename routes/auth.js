@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../db');
-const { auth } = require('../middleware');
+const { auth } = require('../authMiddleware');
 
 const ROLES = ['Procurement Officer', 'Vendor', 'Manager/Approver'];
 const emailOk = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e || '');

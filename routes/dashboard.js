@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const db = require('../db');
-const { auth } = require('../middleware');
+const { auth } = require('../authMiddleware');
 
 router.get('/', auth, (req, res) => {
   const count = where => db.prepare(`SELECT COUNT(*) n FROM vendors ${where}`).get().n;
