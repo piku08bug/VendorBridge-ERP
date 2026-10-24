@@ -6,42 +6,70 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
 
+// Fallback env variables (Vercel crash hone se rokne ke liye)
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'vendorbridge_secure_jwt_secret_2026';
+process.env.ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@vendorbridge.com';
+process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
+
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/vendors', require('./routes/vendors'));
-app.use('/api/dashboard', require('./routes/dashboard'));
+// Static Files
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Protected pages: login nahi to login page pe bhejo
-app.use((req, res, next) => {
-  if (['/dashboard.html', '/vendors.html', '/module.html'].includes(req.path)) {
-    try { jwt.verify(req.cookies.token, process.env.JWT_SECRET); }
-    catch { return res.redirect('/login.html'); }
+// Routes: /api/auth aur /auth dono map kiye taaki 404 na aaye
+const authRoutes = require('./routes/auth');
+const vendorRoutes = require('./routes/vendors');
+const dashRoutes = require('./routes/dashboard');
+
+app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
+app.use('/api/vendors', vendorRoutes);
+app.use('/vendors', vendorRoutes);
+
+app.use('/api/dashboard', dashRoutes);
+app.use('/dashboard', dashRoutes);
+
+// Root route redirect
+app.get('/', (req, res) => {
+  res.redirect('/login.html');
+});
+
+// Auto-seed default Procurement Officer account (Registration ki zaroorat nahi padegi)
+try {
+  const seedEmail = 'admin@vendorbridge.com';
+  const existingUser = db.prepare('SELECT id FROM users WHERE email=?').get(seedEmail);
+  if (!existingUser) {
+    db.prepare(`
+      INSERT INTO users (name, first_name, last_name, phone, country, additional_info, email, password_hash, role)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'Demo Admin',
+      'Demo',
+      'Admin',
+      '9999999999',
+      'India',
+      'Initial Setup',
+      seedEmail,
+      bcrypt.hashSync('Admin@123', 10),
+      'Procurement Officer'
+    );
   }
-  next();
-});
-
-app.use(express.static('public'));
-app.get('/', (req, res) => res.redirect('/dashboard.html'));
-
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Server error' });
-});
-
-// Pehli baar Admin user bana do
-if (!db.prepare("SELECT 1 FROM users WHERE role='Admin'").get()) {
-  db.prepare('INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)')
-    .run('Admin', process.env.ADMIN_EMAIL, bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10), 'Admin');
+} catch (e) {
+  console.error('Seed user error:', e);
 }
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: err.message || 'Server error' });
+});
+
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log('Running on http://localhost:' + port));
+if (require.main === module) {
+  app.listen(port, () => console.log('Running on http://localhost:' + port));
+}
 
 module.exports = app;
-
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => res.redirect('/login.html'));
-
