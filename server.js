@@ -1,3 +1,4 @@
+const path = require('path');
 require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
@@ -43,3 +44,4 @@ module.exports = app;
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.redirect('/login.html'));
+
