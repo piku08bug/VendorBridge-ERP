@@ -1,25 +1,20 @@
 const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'vendorbridge_secure_jwt_2026';
 
-const auth = (req, res, next) => {
+function auth(req, res, next) {
+  const token = (req.cookies && req.cookies.token) || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: Please log in' });
+  }
   try {
-    const token = req.cookies?.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
-    if (!token) return res.status(401).json({ error: 'Unauthorized: No token provided' });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    res.clearCookie('token');
+    return res.status(401).json({ error: 'Session expired' });
   }
-};
+}
 
-const allow = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-    if (roles.length && !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Forbidden: Access denied' });
-    }
-    next();
-  };
-};
-
-module.exports = { auth, allow };
+module.exports = auth;
+module.exports.auth = auth;
