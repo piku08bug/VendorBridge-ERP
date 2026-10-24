@@ -1,7 +1,10 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = process.env.NODE_ENV === 'production' 
+// Vercel serverless environment me sirf /tmp folder writable hota hai
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production');
+const dbPath = isServerless 
   ? path.join('/tmp', 'vendorbridge.db')
   : path.join(__dirname, 'vendorbridge.db');
 
