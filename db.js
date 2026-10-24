@@ -1,5 +1,11 @@
 const Database = require('better-sqlite3');
-const db = new Database('vendorbridge.db');
+const path = require('path');
+
+const dbPath = process.env.NODE_ENV === 'production' 
+  ? path.join('/tmp', 'vendorbridge.db')
+  : path.join(__dirname, 'vendorbridge.db');
+
+const db = new Database(dbPath);
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users(
